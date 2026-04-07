@@ -1,0 +1,19 @@
+# Environments
+venv/
+env/
+.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Reports
+reports/*.html
+reports/allure-results/
+!reports/.gitkeep

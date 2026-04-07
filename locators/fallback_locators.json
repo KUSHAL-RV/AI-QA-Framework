@@ -1,0 +1,15 @@
+{
+  "id|broken_username": [
+    ["name", "username"],
+    ["xpath", "//input[@id='username']"],
+    ["css selector", "input[name='username']"]
+  ],
+  "id|broken_password": [
+    ["name", "password"],
+    ["xpath", "//input[@id='password']"]
+  ],
+  "css selector|button[type='broken']": [
+    ["xpath", "//button[@type='submit']"],
+    ["class name", "radius"]
+  ]
+}
