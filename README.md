@@ -1,6 +1,6 @@
 # AI-Enhanced Test Automation Framework with Self-Healing Capability
 
-This is a production-level, scalable automation testing framework built with Python. It supports UI testing, API testing, AI-based test generation, and features self-healing element locators.
+This is a scalable automation testing framework built with Python. It supports UI testing, API testing, AI-based test generation, and features self-healing element locators.
 
 ## 📁 Project Structure (STEP 1)
 
