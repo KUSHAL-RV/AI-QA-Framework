@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class BasePage:
     def __init__(self, driver, healer=None):
         self.driver = driver
+        # Explicitly allow tests to control the timeout
         self.wait_timeout = int(os.environ.get("SELENIUM_WAIT_TIMEOUT", 10))
         self.wait = WebDriverWait(driver, self.wait_timeout)
         self._healer = healer
@@ -29,10 +30,9 @@ class BasePage:
         ]
         for pattern in close_patterns:
             try:
-                close_btn = WebDriverWait(self.driver, 1).until(
-                    EC.element_to_be_clickable((By.XPATH, pattern))
-                )
-                close_btn.click()
+                close_btn = self.driver.find_element(By.XPATH, pattern)
+                if close_btn.is_displayed():
+                    close_btn.click()
             except:
                 continue
 
@@ -45,30 +45,24 @@ class BasePage:
             lambda driver: driver.execute_script("return document.readyState") == "complete"
         )
 
+    @ResilienceEngine.retry_on_failure(max_retries=2)
     def find_element(self, locator, locator_key: str = ""):
         """
-        Orchestrates element discovery with Resilience and Healing.
-        We wrap the core discovery in the retry engine, but ensure healing only happens once.
+        Hardened element discovery. 
+        Uses the ResilienceEngine for retries, and AI healing as a one-time fallback.
         """
-        # Define the core search logic
-        @ResilienceEngine.retry_on_failure(max_retries=2)
-        def _search():
-            try:
-                return self.wait.until(EC.visibility_of_element_located(locator))
-            except (TimeoutException, NoSuchElementException):
-                raise # Let ResilienceEngine handle the retry
-
         try:
-            return _search()
-        except:
-            # If all standard retries failed, try AI healing EXACTLY ONCE
+            # Primary attempt with explicit wait
+            return self.wait.until(EC.visibility_of_element_located(locator))
+        except (TimeoutException, NoSuchElementException):
+            # Fallback to AI healing if healer is present
             if self._healer:
                 healed = self._try_llm_healing(locator, locator_key)
                 if healed:
                     return healed
             
             # Map back to NoSuchElementException for test compatibility
-            raise NoSuchElementException(f"Element not found after retries: {locator}")
+            raise NoSuchElementException(f"Element not found: {locator}")
 
     # --- Standard Utility Methods ---
 
@@ -102,21 +96,23 @@ class BasePage:
 
     def _try_llm_healing(self, original_locator, locator_key):
         if not self._healer: return None
-        snippet = self.driver.page_source[:10000]
-        suggestion = self._healer.heal(snippet, str(original_locator), locator_key)
         
-        xpath = None
-        if isinstance(suggestion, dict) and "xpath" in suggestion:
-            xpath = suggestion["xpath"]
-        elif suggestion and hasattr(suggestion, "xpath"):
-            xpath = getattr(suggestion, "xpath")
+        try:
+            snippet = self.driver.page_source[:15000]
+            suggestion = self._healer.heal(snippet, str(original_locator), locator_key)
             
-        if xpath:
-            try:
+            xpath = None
+            if isinstance(suggestion, dict) and "xpath" in suggestion:
+                xpath = suggestion["xpath"]
+            elif suggestion and hasattr(suggestion, "xpath"):
+                xpath = getattr(suggestion, "xpath")
+                
+            if xpath:
+                # Use driver directly to avoid re-triggering the decorated find_element
                 element = self.driver.find_element(By.XPATH, xpath)
                 if hasattr(self._healer, "write_back"):
                     self._healer.write_back(locator_key, xpath)
                 return element
-            except:
-                pass
+        except:
+            pass
         return None
