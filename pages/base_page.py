@@ -13,8 +13,7 @@ logger = logging.getLogger(__name__)
 class BasePage:
     def __init__(self, driver, healer=None):
         self.driver = driver
-        # Use a very short timeout for tests/CI to avoid long poll loops
-        self.wait_timeout = int(os.environ.get("SELENIUM_WAIT_TIMEOUT", 1))
+        self.wait_timeout = int(os.environ.get("SELENIUM_WAIT_TIMEOUT", 10))
         self.wait = WebDriverWait(driver, self.wait_timeout)
         self._healer = healer
         self.visual_engine = VisualEngine()
@@ -47,22 +46,32 @@ class BasePage:
 
     def find_element(self, locator, locator_key: str = ""):
         """
-        Production-Ready Discovery. 
-        Matches HealingResult structure and write_back signatures from unit tests.
+        Hardened element discovery.
+        Designed for production resilience and CI test compatibility.
         """
-        # 1. Primary Attempt (Direct call for test mocks)
+        # 1. Primary Attempt (Direct Call)
         try:
             return self.driver.find_element(*locator)
         except NoSuchElementException:
-            # 2. AI Healing (Final Fallback)
+            # 2. AI Healing (Priority Fallback)
             if self._healer:
-                healed_element = self._try_llm_healing(locator, locator_key)
-                if healed_element:
-                    return healed_element
-        except Exception:
-            pass
+                try:
+                    healed = self._try_llm_healing(locator, locator_key)
+                    if healed: return healed
+                except:
+                    pass
 
-        # 3. Final Raise
+            # 3. Resilient Polling (Legacy/Production Fallback)
+            # This handles cases where the browser is just slow, NOT broken.
+            start_time = time.time()
+            while (time.time() - start_time) < self.wait_timeout:
+                try:
+                    return self.driver.find_element(*locator)
+                except NoSuchElementException:
+                    time.sleep(0.5)
+                    continue
+
+        # 4. Final Raise
         raise NoSuchElementException(f"Element not found: {locator}")
 
     # --- Standard Utility Methods ---
@@ -98,27 +107,21 @@ class BasePage:
     def _try_llm_healing(self, original_locator, locator_key):
         if not self._healer: return None
         try:
-            # Get snippet safely
             source = str(self.driver.page_source or "<html></html>")
-            
-            # 1. Call Healer (Expects HealingResult object from tests)
             result = self._healer.heal(source[:15000], str(original_locator), locator_key)
             if not result: return None
 
-            # 2. CI/CD Confidence Gate (Requirement for test_low_confidence_rejected_in_ci)
+            # CI Gate
             confidence = getattr(result, "confidence", "low")
             if os.environ.get("CI") == "1" and confidence == "low":
                 return None
 
-            # 3. Map HealingResult (by/value) to Selenium call
+            # Extraction
             by = getattr(result, "by", "xpath")
             val = getattr(result, "value", "")
             
             if val:
-                # 4. Attempt to find healed element
                 element = self.driver.find_element(by, val)
-                
-                # 5. Write back using the result object (Requirement for test_write_back_called)
                 if hasattr(self._healer, "write_back"):
                     self._healer.write_back(locator_key, result)
                 return element
