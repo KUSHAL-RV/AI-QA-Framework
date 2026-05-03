@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 class BasePage:
     def __init__(self, driver, healer=None):
         self.driver = driver
-        # Explicitly allow tests to control the timeout
         self.wait_timeout = int(os.environ.get("SELENIUM_WAIT_TIMEOUT", 10))
         self.wait = WebDriverWait(driver, self.wait_timeout)
         self._healer = healer
@@ -45,24 +44,31 @@ class BasePage:
             lambda driver: driver.execute_script("return document.readyState") == "complete"
         )
 
-    @ResilienceEngine.retry_on_failure(max_retries=2)
     def find_element(self, locator, locator_key: str = ""):
         """
-        Hardened element discovery. 
-        Uses the ResilienceEngine for retries, and AI healing as a one-time fallback.
+        Hardened element discovery with manual retry to ensure CI/CD mock compatibility.
+        Does NOT use the ResilienceEngine decorator to avoid multiple call count issues in unit tests.
         """
-        try:
-            # Primary attempt with explicit wait
-            return self.wait.until(EC.visibility_of_element_located(locator))
-        except (TimeoutException, NoSuchElementException):
-            # Fallback to AI healing if healer is present
-            if self._healer:
-                healed = self._try_llm_healing(locator, locator_key)
-                if healed:
-                    return healed
-            
-            # Map back to NoSuchElementException for test compatibility
-            raise NoSuchElementException(f"Element not found: {locator}")
+        last_exception = None
+        max_attempts = 2 # Standard retry count
+        
+        for attempt in range(max_attempts):
+            try:
+                return self.wait.until(EC.visibility_of_element_located(locator))
+            except (TimeoutException, NoSuchElementException) as e:
+                last_exception = e
+                if attempt < max_attempts - 1:
+                    time.sleep(1) # Subtle backoff
+                    continue
+        
+        # If standard attempts failed, try AI healing EXACTLY ONCE
+        if self._healer:
+            healed = self._try_llm_healing(locator, locator_key)
+            if healed:
+                return healed
+        
+        # Map back to NoSuchElementException for test compatibility
+        raise NoSuchElementException(f"Element not found after {max_attempts} attempts: {locator}")
 
     # --- Standard Utility Methods ---
 
@@ -98,7 +104,7 @@ class BasePage:
         if not self._healer: return None
         
         try:
-            snippet = self.driver.page_source[:15000]
+            snippet = self.driver.page_source[:10000]
             suggestion = self._healer.heal(snippet, str(original_locator), locator_key)
             
             xpath = None
@@ -108,7 +114,6 @@ class BasePage:
                 xpath = getattr(suggestion, "xpath")
                 
             if xpath:
-                # Use driver directly to avoid re-triggering the decorated find_element
                 element = self.driver.find_element(By.XPATH, xpath)
                 if hasattr(self._healer, "write_back"):
                     self._healer.write_back(locator_key, xpath)
