@@ -12,24 +12,24 @@ class BrokenLoginPage(BasePage):
     LOGIN_BUTTON = (By.CSS_SELECTOR, "button[type='broken']")
     FLASH_MESSAGE = (By.ID, "flash")
 
-    def __init__(self, driver):
-        super().__init__(driver)
+    def __init__(self, driver, healer=None):
+        super().__init__(driver, healer)
 
     def load(self):
         self.open_url("https://the-internet.herokuapp.com/login")
 
     def login(self, username, password):
-        self.enter_text(self.USERNAME_INPUT, username)
-        self.enter_text(self.PASSWORD_INPUT, password)
-        self.click_element(self.LOGIN_BUTTON)
+        self.enter_text(self.USERNAME_INPUT, username, locator_key="username_field")
+        self.enter_text(self.PASSWORD_INPUT, password, locator_key="password_field")
+        self.click_element(self.LOGIN_BUTTON, locator_key="login_button")
 
 class TestSelfHealing:
     """
     Tests the Self Healing locator system by injecting broken locators.
     """
 
-    def test_broken_locators_heal_successfully(self, driver):
-        login_page = BrokenLoginPage(driver)
+    def test_broken_locators_heal_successfully(self, driver, healer):
+        login_page = BrokenLoginPage(driver, healer)
         login_page.load()
         login_page.login("tomsmith", "SuperSecretPassword!")
         

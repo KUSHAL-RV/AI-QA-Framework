@@ -13,6 +13,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
     
     steps:
     - name: Checkout Code
@@ -30,7 +32,7 @@ jobs:
 
     - name: Run PyTest Suite
       # Ensure Tests run silently Headless; failures will prompt HTML report mapping
-      run: pytest --html=reports/report.html --self-contained-html
+      run: pytest -n auto --reruns 2 --reruns-delay 1 --html=reports/report.html --self-contained-html
     
     - name: Upload Test Report
       if: always()

@@ -1,117 +1,78 @@
-# AI-Enhanced Test Automation Framework with Self-Healing Capability
+# AI-Enhanced Test Automation Framework
 
-This is a production-level, scalable automation testing framework built with Python. It supports UI testing, API testing, AI-based test generation, and features self-healing element locators.
+A production-grade, scalable automation framework built with **Python**, **Selenium**, and **PyTest**. This framework integrates **LLM-powered self-healing**, **AI test generation**, and **visual regression testing** to provide end-to-end quality assurance.
 
-## 📁 Project Structure (STEP 1)
+## 🚀 Key Innovations
+
+### 🧠 AI Test Generation & Validation
+- **Descriptive Generation**: Uses **Google Gemini (1.5 Flash)** to generate executable test scenarios from natural language feature descriptions.
+- **Dry Run Validation**: A safety layer that maps AI-generated steps to Page Object methods *before* browser execution, preventing hallucinations and ensuring stability.
+
+### 🩹 LLM-Powered Self-Healing
+- **Three-Layer Escalation**: Elements are resolved through Primary -> Static Fallback -> LLM Healing.
+- **Automated Recovery**: If locators break, Gemini analyzes a pruned DOM snapshot to suggest a fix.
+- **Thread-Safe Persistence**: Healed locators are automatically written back to a JSON registry using `FileLock`, ensuring the AI is only called once per broken element.
+
+### 🖼️ Visual Regression Testing
+- **Pixel-Level Validation**: Uses **Pillow** for screenshot comparison with configurable thresholds.
+- **Visual Diffs**: Automatically generates diff images highlighting UI shifts in red for rapid auditing.
+
+## 📁 Project Structure
 
 ```text
 PROJECT-QA/
-│
-├── tests/              # Contains all PyTest test files (UI, API)
-├── pages/              # Page Object Model (POM) classes representing web pages
-├── utils/              # Reusable core utilities (API clients, Loggers, Helpers)
-├── locators/           # Centralized UI element locators & self-healing fallback JSON
-├── api/                # API wrapper classes and models
-├── reports/            # Output folder for HTML and Allure test reports
-├── ai_engine/          # AI logic for descriptive test case generation
-├── config/             # Configuration files (environments, driver setup)
-├── .github/workflows/  # CI/CD action YAML files
-└── requirements.txt    # Project dependencies
+├── ai_engine/          # Gemini integration, healing logic, and dry-run validator
+├── tests/              # Functional (UI/API), AI-driven, and Visual test suites
+├── pages/              # Page Object Model with integrated healing hooks
+├── utils/              # Visual comparator, API clients, and core helpers
+├── locators/           # Centralized locators & self-healing fallback registry
+├── screenshots/        # Baseline, Latest, and Diff images for visual testing
+├── config/             # Environment settings and API key management
+└── .github/workflows/  # CI/CD pipeline with secret injection
 ```
 
-### Explanation of Folders
-- **`tests/`**: The core execution directory. All `test_*.py` files go here so PyTest can discover them.
-- **`pages/`**: Holds UI logic. Keeps tests clean by separating element interactions from test assertions.
-- **`utils/`**: Helps reduce code duplication. Contains custom loggers, file readers, and API HTTP wrappers.
-- **`locators/`**: Stores locator strings. If a locator breaks, the self-healing logic falls back on alternate locators defined here.
-- **`api/`**: Separates API request payloads, headers, and specific endpoint details.
-- **`reports/`**: Artifact storage for CI/CD or local test debugging.
-- **`ai_engine/`**: Module responsible for talking to LLMs (Google Gemini) to generate readable test scenarios from features.
-- **`config/`**: Manages environment variables and global variables to switch between dev/staging/prod testing seamlessly.
+## 🛠️ Setup & Execution
 
----
-
-## 🛠️ Setup Instructions (STEP 2)
-
-### 1. Python Environment Setup
-Make sure you have Python 3.8+ installed on your system.
-
-Create and activate a virtual environment:
+### 1. Environment Setup
 ```bash
-# On Windows
 python -m venv venv
 venv\Scripts\activate
-```
-
-### 2. Install Required Dependencies
-Install the framework libraries:
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. WebDriver Setup (Chrome)
-Selenium 4 handles WebDriver management automatically (via Selenium Manager). Therefore, you do not need to download the `chromedriver` binary manually. Ensure Google Chrome is installed on your machine.
-
-### 4. Running PyTest
-Run all tests in the project:
-```bash
-pytest
+### 2. Configuration
+Create a `.env` file in the root directory:
+```env
+GEMINI_API_KEY=your_api_key_here
+ENVIRONMENT=qa
+BASE_URL=https://the-internet.herokuapp.com
 ```
 
-Run tests with console output:
+### 3. Running Tests
 ```bash
-pytest -v -s
-```
+# Run functional tests (with 8-core parallelization)
+pytest -n auto
 
-### 5. Generating Reports
-To generate a simple integrated HTML report:
-```bash
+# Run visual regression tests
+pytest tests/visual/
+
+# Run with HTML report
 pytest --html=reports/report.html --self-contained-html
 ```
 
-To use Allure (if you have Allure CLI installed):
-```bash
-pytest --alluredir=reports/allure-results
-# After test run:
-allure serve reports/allure-results
+## 🔄 CI/CD Pipeline
+The included GitHub Action (`main.yml`) automates:
+1. Environment setup and dependency installation.
+2. Secure secret injection for Gemini API.
+3. Parallel test execution.
+4. Test report artifact uploading.
+
+## 🤖 AI Healing in Action
+When a primary locator fails, you'll see the escalation in the logs:
+```text
+WARNING - Primary locator failed: ('id', 'broken_btn'). Attempting fallbacks...
+WARNING - All static fallbacks exhausted for 'login_button'
+INFO - Attempting LLM healing for 'login_button'...
+INFO - LLM suggested new locator: ('xpath', '//button[@type="submit"]')
+INFO - Successfully healed 'login_button'. Persisting to registry.
 ```
-
----
-
-## 🏃‍♀️ Sample Test Execution Output (STEP 10)
-
-```bash
-$ pytest -v -s
-============================= test session starts ==============================
-collected 6 items
-
-tests/test_ai_generator.py::TestAIGenerator::test_mock_rule_based_login_generation PASSED
-tests/test_api.py::TestAPI::test_get_users PASSED
-tests/test_api.py::TestAPI::test_create_user PASSED
-tests/test_login.py::TestLogin::test_valid_login PASSED
-tests/test_login.py::TestLogin::test_invalid_login PASSED
-tests/test_self_healing.py::TestSelfHealing::test_broken_locators_heal_successfully 
-WARNING: Primary locator failed: ('id', 'broken_username'). Attempting self-healing...
-INFO: SUCCESS: Healed locator ('id', 'broken_username') with fallback ('name', 'username')
-PASSED
-
-============================== 6 passed in 12.4s ===============================
-```
-
-## 📈 Performance Testing (STEP 8)
-Run a simple load test to benchmark the API response:
-```bash
-locust -f tests/performance/locustfile.py --host=https://jsonplaceholder.typicode.com
-```
-Navigate to `http://localhost:8089` to view the Locust dashboard and start spawning users.
-
-## 🤖 AI Test Generation (STEP 6)
-You can automatically generate test cases from feature descriptions! Setting the `GEMINI_API_KEY` environment variable enables real Google Gemini generation, otherwise it defaults to a local rule-based engine.
-```python
-from ai_engine.generator import AITestGenerator
-generator = AITestGenerator()
-print(generator.generate_test_cases("Checkout Flow"))
-```
-
-## 🔄 CI/CD Pipeline (STEP 9)
-A GitHub actions YAML file is provided under `.github/workflows/main.yml`. It triggers tests on every push/PR to the `main` branch, running UI/API tests Headless and uploading an HTML report artifact.

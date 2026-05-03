@@ -7,8 +7,8 @@ class TestLogin:
     Using Pytest assertions.
     """
 
-    def test_valid_login(self, driver):
-        login_page = LoginPage(driver)
+    def test_valid_login(self, driver, healer):
+        login_page = LoginPage(driver, healer)
         login_page.load()
         login_page.login("tomsmith", "SuperSecretPassword!")
         
@@ -16,8 +16,8 @@ class TestLogin:
         # Assertion: Check if the success message is displayed
         assert "You logged into a secure area!" in flash_message
 
-    def test_invalid_login(self, driver):
-        login_page = LoginPage(driver)
+    def test_invalid_login(self, driver, healer):
+        login_page = LoginPage(driver, healer)
         login_page.load()
         login_page.login("invalid_user", "invalid_password")
         

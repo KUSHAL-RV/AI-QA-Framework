@@ -17,3 +17,6 @@ htmlcov/
 reports/*.html
 reports/allure-results/
 !reports/.gitkeep
+
+# Locks
+*.lock

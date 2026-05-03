@@ -24,6 +24,14 @@ class AITestGenerator:
         else:
             return self._generate_via_rules(feature_description)
 
+    def generate_scenarios(self, feature_description: str) -> list[dict]:
+        """
+        Generates structured scenarios: [{"name": str, "steps": [str, ...]}]
+        """
+        cases = self.generate_test_cases(feature_description)
+        # For this simple implementation, treat each case as a scenario with one step
+        return [{"name": case, "steps": [case]} for case in cases]
+
     def _generate_via_gemini(self, feature_description: str):
         prompt = f"Generate a list of 5 brief testing scenarios for the following feature. Return each scenario on a new line: {feature_description}"
         try:
