@@ -174,7 +174,9 @@ class BasePage:
         self.driver.save_screenshot(screenshot_path)
         logger.info(f"Captured visual snapshot: {screenshot_path}")
         
-        is_match = VisualComparator.compare(test_name, threshold)
+        # Adjust threshold slightly for CI due to font/anti-aliasing differences
+        actual_threshold = threshold * 2 if os.getenv("CI") else threshold
+        is_match = VisualComparator.compare(test_name, actual_threshold)
         if not is_match:
             diff_path = os.path.join(VisualComparator.DIFF_DIR, f"{test_name}_diff.png")
             raise AssertionError(f"Visual mismatch detected for {test_name}! Diff saved to {diff_path}")

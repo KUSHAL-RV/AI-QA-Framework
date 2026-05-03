@@ -94,6 +94,7 @@ class TestLLMLocatorHealer:
         assert result.by == "css selector"
         assert result.value == ".submit-btn"
 
+    @patch.dict(os.environ, {"CI": ""})
     def test_low_confidence_result_still_attempted(self):
         driver = MagicMock()
         mock_element = MagicMock()

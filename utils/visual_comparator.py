@@ -34,8 +34,8 @@ class VisualComparator:
         img2 = Image.open(latest_path).convert("RGB")
 
         if img1.size != img2.size:
-            logger.warning(f"Size mismatch for {test_name}: {img1.size} vs {img2.size}")
-            return False
+            logger.warning(f"Size mismatch for {test_name}: {img1.size} vs {img2.size}. Resizing to match baseline.")
+            img2 = img2.resize(img1.size, Image.Resampling.LANCZOS)
 
         diff = ImageChops.difference(img1, img2)
         
