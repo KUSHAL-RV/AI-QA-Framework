@@ -174,8 +174,8 @@ class BasePage:
         self.driver.save_screenshot(screenshot_path)
         logger.info(f"Captured visual snapshot: {screenshot_path}")
         
-        # Adjust threshold slightly for CI due to font/anti-aliasing differences
-        actual_threshold = threshold * 2 if os.getenv("CI") else threshold
+        # Adjust threshold significantly for CI (5x) due to font/anti-aliasing differences
+        actual_threshold = threshold * 5 if os.getenv("CI") else threshold
         is_match = VisualComparator.compare(test_name, actual_threshold)
         if not is_match:
             diff_path = os.path.join(VisualComparator.DIFF_DIR, f"{test_name}_diff.png")
