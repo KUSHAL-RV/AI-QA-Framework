@@ -1,6 +1,10 @@
 # AI-Enhanced Test Automation Framework
 
+<<<<<<< HEAD
 A production-grade, scalable automation framework built with **Python**, **Selenium**, and **PyTest**. This framework integrates **LLM-powered self-healing**, **AI test generation**, and **visual regression testing** to provide end-to-end quality assurance.
+=======
+This is a scalable automation testing framework built with Python. It supports UI testing, API testing, AI-based test generation, and features self-healing element locators.
+>>>>>>> 921db0a294a74f199286f74fbed6410fe8bb0531
 
 ## 🚀 Key Innovations
 
