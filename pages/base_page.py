@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class BasePage:
     def __init__(self, driver, healer=None):
         self.driver = driver
-        self.wait = WebDriverWait(driver, 10) # Reduced default wait for CI efficiency
+        self.wait = WebDriverWait(driver, 10)
         self._healer = healer
         self.visual_engine = VisualEngine()
 
@@ -54,7 +54,7 @@ class BasePage:
                 return self._try_llm_healing(locator, locator_key)
             raise
 
-    # --- Standard Page Object Methods (Fixed Aliases) ---
+    # --- Standard Utility Methods ---
 
     def enter_text(self, locator, text, locator_key=""):
         element = self.find_element(locator, locator_key)
@@ -64,10 +64,13 @@ class BasePage:
     def click(self, locator, locator_key=""):
         element = self.find_element(locator, locator_key)
         element.click()
-        
+
     def click_element(self, locator, locator_key=""):
-        """Alias for click() to support existing Page Objects."""
         self.click(locator, locator_key)
+
+    def get_element_text(self, locator, locator_key=""):
+        element = self.find_element(locator, locator_key)
+        return element.text
 
     def assert_visual_match(self, name, threshold=0.05):
         os.makedirs("screenshots/latest", exist_ok=True)
@@ -86,17 +89,19 @@ class BasePage:
         snippet = self.driver.page_source[:10000]
         suggestion = self._healer.heal(snippet, str(original_locator), locator_key)
         
-        # Robust handling for both dict and custom object results
         xpath = None
         if isinstance(suggestion, dict) and "xpath" in suggestion:
             xpath = suggestion["xpath"]
-        elif hasattr(suggestion, "xpath"):
+        elif suggestion and hasattr(suggestion, "xpath"):
             xpath = getattr(suggestion, "xpath")
             
         if xpath:
             try:
-                # Direct driver call to avoid infinite recursion
-                return self.driver.find_element("xpath", xpath)
+                element = self.driver.find_element("xpath", xpath)
+                # Success! Write back the fix if healer supports it (for regression tests)
+                if hasattr(self._healer, "write_back"):
+                    self._healer.write_back(locator_key, xpath)
+                return element
             except:
                 pass
         return None

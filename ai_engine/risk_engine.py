@@ -35,7 +35,7 @@ class RiskScorer:
         TASK:
         Assign a risk score (1-10) and provide multiple locator strategies (id, aria, css, xpath).
         
-        OUTPUT FORMAT:
+        OUTPUT FORMAT (Return valid JSON):
         {{
           "elements": [
             {{
@@ -57,9 +57,9 @@ class RiskScorer:
             )
         except Exception as e:
             if "rate_limit" in str(e).lower():
-                print("  Primary model rate limited. Falling back to llama3-8b-8192...")
+                print("  Primary model rate limited. Falling back to mixtral-8x7b-32768...")
                 response = self.client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="mixtral-8x7b-32768",
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"}
                 )
