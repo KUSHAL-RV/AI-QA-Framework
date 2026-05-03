@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 class BasePage:
     def __init__(self, driver, healer=None):
         self.driver = driver
-        # Use a faster wait for CI, but allow override
         self.wait_timeout = int(os.environ.get("SELENIUM_WAIT_TIMEOUT", 10))
         self.wait = WebDriverWait(driver, self.wait_timeout)
         self._healer = healer
@@ -46,19 +45,30 @@ class BasePage:
             lambda driver: driver.execute_script("return document.readyState") == "complete"
         )
 
-    @ResilienceEngine.retry_on_failure(max_retries=2)
     def find_element(self, locator, locator_key: str = ""):
-        """Finds element with explicit wait, AI healing fallback, and exception mapping."""
+        """
+        Orchestrates element discovery with Resilience and Healing.
+        We wrap the core discovery in the retry engine, but ensure healing only happens once.
+        """
+        # Define the core search logic
+        @ResilienceEngine.retry_on_failure(max_retries=2)
+        def _search():
+            try:
+                return self.wait.until(EC.visibility_of_element_located(locator))
+            except (TimeoutException, NoSuchElementException):
+                raise # Let ResilienceEngine handle the retry
+
         try:
-            return self.wait.until(EC.visibility_of_element_located(locator))
-        except (TimeoutException, NoSuchElementException):
+            return _search()
+        except:
+            # If all standard retries failed, try AI healing EXACTLY ONCE
             if self._healer:
                 healed = self._try_llm_healing(locator, locator_key)
                 if healed:
                     return healed
             
-            # Map TimeoutException to NoSuchElementException for test compatibility
-            raise NoSuchElementException(f"Element not found after {self.wait_timeout}s: {locator}")
+            # Map back to NoSuchElementException for test compatibility
+            raise NoSuchElementException(f"Element not found after retries: {locator}")
 
     # --- Standard Utility Methods ---
 
@@ -92,13 +102,6 @@ class BasePage:
 
     def _try_llm_healing(self, original_locator, locator_key):
         if not self._healer: return None
-        
-        # Check if we should skip healing in CI (based on existing test logic)
-        if os.environ.get("CI") == "1":
-            # Some tests expect low-confidence results to be rejected in CI
-            # We'll let the healer handle the confidence check, but if it returns None, we respect it.
-            pass
-
         snippet = self.driver.page_source[:10000]
         suggestion = self._healer.heal(snippet, str(original_locator), locator_key)
         
@@ -110,13 +113,9 @@ class BasePage:
             
         if xpath:
             try:
-                # Use driver.find_element directly to verify the fix
                 element = self.driver.find_element(By.XPATH, xpath)
-                
-                # CRITICAL for tests: always call write_back if element is found
                 if hasattr(self._healer, "write_back"):
                     self._healer.write_back(locator_key, xpath)
-                    
                 return element
             except:
                 pass
