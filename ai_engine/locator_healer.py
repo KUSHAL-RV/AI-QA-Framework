@@ -35,9 +35,12 @@ class HealingResult:
         return by_map.get(self.by, By.XPATH), self.value
 
 
+import os
+from groq import Groq
+
 class LLMLocatorHealer:
     """
-    Last-resort locator recovery using Gemini.
+    Last-resort locator recovery using Groq.
     Called by BasePage.find_element only after all static fallbacks fail.
     """
 
@@ -58,16 +61,22 @@ Respond ONLY with a valid JSON object — no markdown, no explanation:
 }
 
 Rules:
-- Prefer stable attributes: data-testid, aria-label, role, name, type
-- Avoid positional XPath like //div[3]/span[2] — it breaks on reorder
-- Avoid class names that look auto-generated (e.g. css-a3bc12)
-- If nothing stable exists, use a short relative XPath anchored to a stable parent
+- DO NOT invent or hallucinate data-testids if you don't see them in the HTML.
+- Prefer stable attributes: aria-label, role, name, type, title.
+- If no stable IDs exist, use a short relative XPath anchored to a unique text element or a stable parent.
+- Avoid positional XPath like //div[3]/span[2] unless absolutely necessary.
+- Return ONLY the JSON.
 """
 
     def __init__(self, api_key: Optional[str] = None):
-        if api_key:
-            genai.configure(api_key=api_key)
-        self._model = genai.GenerativeModel("gemini-1.5-flash")
+        api_key = api_key or os.getenv("GROQ_API_KEY")
+        if not api_key:
+            logger.error("GROQ_API_KEY is not configured. AI Healing will be disabled.")
+            self._client = None
+            return
+            
+        self._client = Groq(api_key=api_key)
+        self._model = "llama-3.3-70b-versatile"
 
     def heal(
         self,
@@ -89,13 +98,23 @@ Rules:
         dom_snapshot = self._extract_dom(driver)
         prompt = self._build_prompt(locator_key, element_description, dom_snapshot)
 
+        if not self._client:
+            return None
+            
         try:
-            response = self._model.generate_content(prompt)
-            raw = response.text.strip()
+            chat_completion = self._client.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": self._SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt}
+                ],
+                model=self._model,
+                temperature=0.0,
+            )
+            raw = chat_completion.choices[0].message.content.strip()
             result = self._parse_response(raw)
             if result:
                 logger.info(
-                    "LLM healing succeeded for '%s': %s='%s' (confidence: %s)",
+                    "Groq healing succeeded for '%s': %s='%s' (confidence: %s)",
                     locator_key, result.by, result.value, result.confidence,
                 )
             return result
