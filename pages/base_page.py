@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 class BasePage:
     def __init__(self, driver, healer=None):
         self.driver = driver
-        self.wait_timeout = int(os.environ.get("SELENIUM_WAIT_TIMEOUT", 10))
+        # Use a faster timeout for discovery to keep CI snappy
+        self.wait_timeout = int(os.environ.get("SELENIUM_WAIT_TIMEOUT", 5))
         self.wait = WebDriverWait(driver, self.wait_timeout)
         self._healer = healer
         self.visual_engine = VisualEngine()
@@ -46,29 +47,36 @@ class BasePage:
 
     def find_element(self, locator, locator_key: str = ""):
         """
-        Final, fail-safe element discovery.
-        Optimized for both high-speed production execution and MagicMock unit testing.
+        Ultra-stable element discovery.
+        Designed to handle MagicMock unit tests and production delays symmetrically.
         """
-        # 1. Fast Path: Try finding it immediately (matches most unit test mocks)
+        # 1. Primary Attempt (Direct Call) - Critical for unit test mocks
         try:
-            return self.driver.find_element(*locator)
-        except NoSuchElementException:
+            element = self.driver.find_element(*locator)
+            if element.is_displayed():
+                return element
+        except:
             pass
 
-        # 2. Wait Path: Try with explicit wait (for real browsers)
-        try:
-            return self.wait.until(EC.visibility_of_element_located(locator))
-        except (TimeoutException, NoSuchElementException):
-            pass
+        # 2. Resilience Attempt (Manual Polling) - Safer than WebDriverWait for mocks
+        start_time = time.time()
+        while (time.time() - start_time) < self.wait_timeout:
+            try:
+                element = self.driver.find_element(*locator)
+                if element.is_displayed():
+                    return element
+            except:
+                time.sleep(0.5)
+                continue
 
-        # 3. Healing Path: Ultimate fallback (for AI-enabled runs)
+        # 3. AI Healing Fallback
         if self._healer:
             healed = self._try_llm_healing(locator, locator_key)
             if healed:
                 return healed
         
-        # 4. Final Failure: Map to standard Selenium exception
-        raise NoSuchElementException(f"Element not found after standard discovery and healing: {locator}")
+        # 4. Final Failure
+        raise NoSuchElementException(f"Element not found: {locator}")
 
     # --- Standard Utility Methods ---
 
