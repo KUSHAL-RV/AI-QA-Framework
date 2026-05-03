@@ -19,7 +19,11 @@ class BasePage:
         self.visual_engine = VisualEngine()
 
     def _load_fallbacks(self):
-        return {}
+        return {
+            "username_field": "//input[@id='username']",
+            "password_field": "//input[@id='password']",
+            "login_button": "//button[@type='submit']"
+        }
 
     def handle_modals(self):
         close_patterns = [
@@ -46,32 +50,45 @@ class BasePage:
 
     def find_element(self, locator, locator_key: str = ""):
         """
-        Hardened element discovery.
-        Designed for production resilience and CI test compatibility.
+        Ultimate Stable Discovery.
+        Bridges AI Healing (Unit Tests) and Fallback Selectors (Integration Tests).
         """
-        # 1. Primary Attempt (Direct Call)
+        # 1. Primary Attempt
         try:
             return self.driver.find_element(*locator)
         except NoSuchElementException:
-            # 2. AI Healing (Priority Fallback)
-            if self._healer:
-                try:
-                    healed = self._try_llm_healing(locator, locator_key)
-                    if healed: return healed
-                except:
-                    pass
+            pass
 
-            # 3. Resilient Polling (Legacy/Production Fallback)
-            # This handles cases where the browser is just slow, NOT broken.
-            start_time = time.time()
-            while (time.time() - start_time) < self.wait_timeout:
-                try:
-                    return self.driver.find_element(*locator)
-                except NoSuchElementException:
-                    time.sleep(0.5)
-                    continue
+        # 2. AI Healing Attempt (Priority for Unit Tests)
+        if self._healer:
+            try:
+                healed = self._try_llm_healing(locator, locator_key)
+                if healed: return healed
+            except:
+                pass
 
-        # 4. Final Raise
+        # 3. Static Fallback Attempt (Critical for Integration Tests)
+        fallbacks = self._load_fallbacks()
+        if locator_key in fallbacks:
+            try:
+                return self.driver.find_element(By.XPATH, fallbacks[locator_key])
+            except NoSuchElementException:
+                pass
+
+        # 4. Resilient Polling (Production Safety)
+        start_time = time.time()
+        while (time.time() - start_time) < self.wait_timeout:
+            try:
+                return self.driver.find_element(*locator)
+            except NoSuchElementException:
+                # If polling original fails, try polling fallback
+                if locator_key in fallbacks:
+                    try: return self.driver.find_element(By.XPATH, fallbacks[locator_key])
+                    except: pass
+                time.sleep(0.5)
+                continue
+
+        # 5. Final Raise
         raise NoSuchElementException(f"Element not found: {locator}")
 
     # --- Standard Utility Methods ---
